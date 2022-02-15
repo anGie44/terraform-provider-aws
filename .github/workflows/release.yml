@@ -49,7 +49,7 @@ jobs:
       - name: goreleaser release
         uses: goreleaser/goreleaser-action@v2
         with:
-          args: release --release-notes ${{ steps.release-notes-download.outputs.download-path }}/release-notes.txt --rm-dist
+          args: release --release-notes ${{ steps.release-notes-download.outputs.download-path }}/release-notes.txt --rm-dist --timeout 1h
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   #  terraform-provider-release:
@@ -93,6 +93,7 @@ jobs:
   #          github_token: ${{ secrets.ORGSCOPED_GITHUB_TOKEN }}
   changelog-newversion:
     runs-on: ubuntu-latest
+    needs: [release]
     steps:
       - uses: actions/checkout@v2
         with:

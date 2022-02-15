@@ -5,6 +5,7 @@
 # Terraform Provider for AWS
 
 [![Forums][discuss-badge]][discuss]
+[![Release](https://github.com/anGie44/terraform-provider-aws/actions/workflows/release.yml/badge.svg?event=release)](https://github.com/anGie44/terraform-provider-aws/actions/workflows/release.yml)
 
 [discuss-badge]: https://img.shields.io/badge/discuss-terraform--aws-623CE4.svg?style=flat
 [discuss]: https://discuss.hashicorp.com/c/terraform-providers/tf-aws/
