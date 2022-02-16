@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   go-version:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       version: ${{ steps.go-version.outputs.version }}
     steps:
@@ -18,7 +18,7 @@ jobs:
       - id: go-version
         run: echo "::set-output name=version::$(cat ./.go-version)"
   release-notes:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
         with:
@@ -32,7 +32,7 @@ jobs:
           retention-days: 1
   release:
     needs: [ go-version, release-notes ]
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
         with:
@@ -49,7 +49,7 @@ jobs:
       - name: goreleaser release
         uses: goreleaser/goreleaser-action@v2
         with:
-          args: release --release-notes ${{ steps.release-notes-download.outputs.download-path }}/release-notes.txt --rm-dist --timeout 2h30m --parallelism 4
+          args: release --release-notes ${{ steps.release-notes-download.outputs.download-path }}/release-notes.txt --rm-dist --timeout 2h30m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   #  terraform-provider-release:
@@ -92,7 +92,7 @@ jobs:
   #          github_release_name: ${{ github.event.release.tag_name }}
   #          github_token: ${{ secrets.ORGSCOPED_GITHUB_TOKEN }}
   changelog-newversion:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     needs: [release]
     steps:
       - uses: actions/checkout@v2
