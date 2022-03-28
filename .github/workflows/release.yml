@@ -36,31 +36,31 @@ jobs:
         run: |
           tag=$(git describe --abbrev=0 --match='v*.*.*' --tags)
           echo ::set-output name=tag::$tag
-  terraform-provider-release:
-    needs: [go-version, release-notes]
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          # Allow tag to be fetched when ref is a commit
-          fetch-depth: 0
-      - uses: actions/setup-go@v2
-        with:
-          go-version: ${{ needs.go-version.outputs.version }}
-      - name: Release Notes Download
-        id: release-notes-download
-        uses: actions/download-artifact@v2
-        with:
-          name: release-notes
-          path: /tmp
-      - name: goreleaser release (with release notes)
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          args: release --release-notes ${{ steps.release-notes-download.outputs.download-path }}/release-notes.txt --rm-dist
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#  terraform-provider-release:
+#    needs: [go-version, release-notes]
+#    runs-on: macos-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#        with:
+#          # Allow tag to be fetched when ref is a commit
+#          fetch-depth: 0
+#      - uses: actions/setup-go@v2
+#        with:
+#          go-version: ${{ needs.go-version.outputs.version }}
+#      - name: Release Notes Download
+#        id: release-notes-download
+#        uses: actions/download-artifact@v2
+#        with:
+#          name: release-notes
+#          path: /tmp
+#      - name: goreleaser release (with release notes)
+#        uses: goreleaser/goreleaser-action@v2
+#        with:
+#          args: release --release-notes ${{ steps.release-notes-download.outputs.download-path }}/release-notes.txt --rm-dist
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   changelog-newversion:
-    needs: [release-notes, terraform-provider-release]
+    needs: [release-notes]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
@@ -76,15 +76,14 @@ jobs:
             releaseBranches=(`echo $branch | grep -Eo "release/.*"`)
   
             if [[ ${#releaseBranches[@]} -eq 1 ]]; then
+              echo "Checking out release branch: $releaseBranches"
               git checkout $releaseBranches
             else
               echo "Unable to checkout release branch to update CHANGELOG.md after ${{ needs.release-notes.outputs.tag }}"
               exit 1
             fi
           fi
-      - name: Update Changelog Header
-        id: changelog
-        run: |
+
           CHANGELOG_FILE_NAME="CHANGELOG.md"
           PREVIOUS_RELEASE_TAG=${{ needs.release-notes.outputs.tag }}
           
@@ -104,7 +103,7 @@ jobs:
           echo New minor version is: v$NEW_RELEASE_LINE
           
           echo -e "## $NEW_RELEASE_LINE (Unreleased)\n$(cat $CHANGELOG_FILE_NAME)" > $CHANGELOG_FILE_NAME
-      - run: |          
+
           git config --local user.email changelogbot@hashicorp.com
           git config --local user.name changelogbot
           git add CHANGELOG.md
