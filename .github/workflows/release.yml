@@ -61,7 +61,7 @@ jobs:
 #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   changelog-newversion:
     needs: [release-notes]
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
