@@ -67,13 +67,14 @@ jobs:
         with:
           fetch-depth: 0
       - run: |
-          commit=$(git rev-list -1 ${{ needs.release-notes.outputs.tag }})
-          branch=$(git branch --contains $commit)
-          releaseBranches=(`echo $branch | grep -Eo "release/.*"`)
-
-          echo -e "Commit: $commit"
-          echo -e "Branch: $branch"
-          echo -e "Release Branches: $releaseBranches"
+          COMMIT=$(git rev-list -1 ${{ needs.release-notes.outputs.tag }})
+          echo -e "Commit: $COMMIT"
+          
+          BRANCH=$(git branch --contains $COMMIT)
+          echo -e "Branch: $BRANCH"
+         
+          RELEASE_BRANCHES=(`echo $BRANCH | grep -Eo "release/.*"`)
+          echo -e "Release Branches: $RELEASE_BRANCHES"
         
           
 #          if [[ ${branch} == *"main"* ]]; then
