@@ -75,7 +75,7 @@ jobs:
           BRANCH=$(git branch -a --contains $COMMIT)
           echo -e "Branch: $BRANCH"
          
-          RELEASE_BRANCHES=`echo $BRANCH | grep release/ | xargs`
+          RELEASE_BRANCHES=`echo $BRANCH | grep release/`
           echo -e "Release Branches: $RELEASE_BRANCHES"
         
           
