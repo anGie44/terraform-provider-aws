@@ -70,7 +70,9 @@ jobs:
           COMMIT=$(git rev-list -1 ${{ needs.release-notes.outputs.tag }})
           echo -e "Commit: $COMMIT"
           
-          BRANCH=$(git branch --contains $COMMIT)
+          git branch -a --contains $COMMIT
+          
+          BRANCH=$(git branch -a --contains $COMMIT)
           echo -e "Branch: $BRANCH"
          
           RELEASE_BRANCHES=`echo $BRANCH | sed -n '/release\//p' | xargs`
