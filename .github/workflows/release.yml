@@ -109,3 +109,4 @@ jobs:
           git add CHANGELOG.md
           git commit -m "Update CHANGELOG.md after ${{ needs.release-notes.outputs.tag }}" 
           git push
+        shell: bash
