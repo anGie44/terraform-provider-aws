@@ -9,14 +9,14 @@ permissions:
   contents: write
 
 jobs:
-  go-version:
-    runs-on: macos-latest
-    outputs:
-      version: ${{ steps.go-version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v2
-      - id: go-version
-        run: echo "::set-output name=version::$(cat ./.go-version)"
+#  go-version:
+#    runs-on: macos-latest
+#    outputs:
+#      version: ${{ steps.go-version.outputs.version }}
+#    steps:
+#      - uses: actions/checkout@v2
+#      - id: go-version
+#        run: echo "::set-output name=version::$(cat ./.go-version)"
   release-notes:
     runs-on: macos-latest
     outputs:
@@ -69,44 +69,49 @@ jobs:
       - run: |
           commit=$(git rev-list -1 ${{ needs.release-notes.outputs.tag }})
           branch=$(git branch --contains $commit)
-          
-          if [[ ${branch} == *"main"* ]]; then
-            git checkout main
-          else
-            releaseBranches=(`echo $branch | grep -Eo "release/.*"`)
-  
-            if [[ ${#releaseBranches[@]} -eq 1 ]]; then
-              echo "Checking out release branch: $releaseBranches"
-              git checkout $releaseBranches
-            else
-              echo "Unable to checkout release branch to update CHANGELOG.md after ${{ needs.release-notes.outputs.tag }}"
-              exit 1
-            fi
-          fi
+          releaseBranches=(`echo $branch | grep -Eo "release/.*"`)
 
-          CHANGELOG_FILE_NAME="CHANGELOG.md"
-          PREVIOUS_RELEASE_TAG=${{ needs.release-notes.outputs.tag }}
+          echo "Commit: $commit"
+          echo "Branch: $branch"
+          echo "Release Branches: $releaseBranches"
+        
           
-          # Add Release Date
-          RELEASE_DATE=`date +%B' '%e', '%Y`
-          sed -i -e "1 s/Unreleased/$RELEASE_DATE/" $CHANGELOG_FILE_NAME           
-          
-          # Prepend next release line
-          echo Previous release is: $PREVIOUS_RELEASE_TAG
-          
-          NEW_RELEASE_LINE=$(echo $PREVIOUS_RELEASE_TAG | awk -F. '{
-              $1 = substr($1,2)
-              $2 += 1
-              printf("%s.%01d.0\n\n", $1, $2);
-          }')
-          
-          echo New minor version is: v$NEW_RELEASE_LINE
-          
-          echo -e "## $NEW_RELEASE_LINE (Unreleased)\n$(cat $CHANGELOG_FILE_NAME)" > $CHANGELOG_FILE_NAME
-
-          git config --local user.email changelogbot@hashicorp.com
-          git config --local user.name changelogbot
-          git add CHANGELOG.md
-          git commit -m "Update CHANGELOG.md after ${{ needs.release-notes.outputs.tag }}" 
-          git push
-        shell: bash
+#          if [[ ${branch} == *"main"* ]]; then
+#            git checkout main
+#          else
+#            releaseBranches=(`echo $branch | grep -Eo "release/.*"`)
+#
+#            if [[ ${#releaseBranches[@]} -eq 1 ]]; then
+#              echo "Checking out release branch: $releaseBranches"
+#              git checkout $releaseBranches
+#            else
+#              echo "Unable to checkout release branch to update CHANGELOG.md after ${{ needs.release-notes.outputs.tag }}"
+#              exit 1
+#            fi
+#          fi
+#
+#          CHANGELOG_FILE_NAME="CHANGELOG.md"
+#          PREVIOUS_RELEASE_TAG=${{ needs.release-notes.outputs.tag }}
+#
+#          # Add Release Date
+#          RELEASE_DATE=`date +%B' '%e', '%Y`
+#          sed -i -e "1 s/Unreleased/$RELEASE_DATE/" $CHANGELOG_FILE_NAME
+#
+#          # Prepend next release line
+#          echo Previous release is: $PREVIOUS_RELEASE_TAG
+#
+#          NEW_RELEASE_LINE=$(echo $PREVIOUS_RELEASE_TAG | awk -F. '{
+#              $1 = substr($1,2)
+#              $2 += 1
+#              printf("%s.%01d.0\n\n", $1, $2);
+#          }')
+#
+#          echo New minor version is: v$NEW_RELEASE_LINE
+#
+#          echo -e "## $NEW_RELEASE_LINE (Unreleased)\n$(cat $CHANGELOG_FILE_NAME)" > $CHANGELOG_FILE_NAME
+#
+#          git config --local user.email changelogbot@hashicorp.com
+#          git config --local user.name changelogbot
+#          git add CHANGELOG.md
+#          git commit -m "Update CHANGELOG.md after ${{ needs.release-notes.outputs.tag }}"
+#          git push
