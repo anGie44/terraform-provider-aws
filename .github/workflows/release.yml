@@ -51,6 +51,9 @@ jobs:
       branch: ${{ steps.git-branch.outputs.branch }}
       tag: ${{ steps.git-branch.outputs.tag }}
     steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - id: git-branch
         run: |
           tag=$(git describe --abbrev=0 --match='v*.*.*' --tags)
