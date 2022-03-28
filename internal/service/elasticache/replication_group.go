@@ -121,6 +121,7 @@ func ResourceReplicationGroup() *schema.Resource {
 				Optional:     true,
 				Computed:     true,
 				ExactlyOneOf: []string{"description", "replication_group_description"},
+				ValidateFunc: validation.StringIsNotEmpty,
 			},
 			"engine": {
 				Type:         schema.TypeString,
@@ -156,6 +157,34 @@ func ResourceReplicationGroup() *schema.Resource {
 					"at_rest_encryption_enabled",
 					"snapshot_arns",
 					"snapshot_name",
+				},
+			},
+			"log_delivery_configuration": {
+				Type:     schema.TypeSet,
+				Optional: true,
+				MaxItems: 2,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"destination_type": {
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringInSlice(elasticache.DestinationType_Values(), false),
+						},
+						"destination": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						"log_format": {
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringInSlice(elasticache.LogFormat_Values(), false),
+						},
+						"log_type": {
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringInSlice(elasticache.LogType_Values(), false),
+						},
+					},
 				},
 			},
 			"maintenance_window": {
@@ -254,6 +283,7 @@ func ResourceReplicationGroup() *schema.Resource {
 				Computed:     true,
 				ExactlyOneOf: []string{"description", "replication_group_description"},
 				Deprecated:   "Use description instead",
+				ValidateFunc: validation.StringIsNotEmpty,
 			},
 			"replication_group_id": {
 				Type:         schema.TypeString,
@@ -439,6 +469,15 @@ func resourceReplicationGroupCreate(d *schema.ResourceData, meta interface{}) er
 
 	if snaps := d.Get("snapshot_arns").(*schema.Set); snaps.Len() > 0 {
 		params.SnapshotArns = flex.ExpandStringSet(snaps)
+	}
+
+	if v, ok := d.GetOk("log_delivery_configuration"); ok {
+		params.LogDeliveryConfigurations = []*elasticache.LogDeliveryConfigurationRequest{}
+		v := v.(*schema.Set).List()
+		for _, v := range v {
+			logDeliveryConfigurationRequest := expandLogDeliveryConfigurations(v.(map[string]interface{}))
+			params.LogDeliveryConfigurations = append(params.LogDeliveryConfigurations, &logDeliveryConfigurationRequest)
+		}
 	}
 
 	if v, ok := d.GetOk("maintenance_window"); ok {
@@ -653,6 +692,7 @@ func resourceReplicationGroupRead(d *schema.ResourceData, meta interface{}) erro
 			return err
 		}
 
+		d.Set("log_delivery_configuration", flattenLogDeliveryConfigurations(rgp.LogDeliveryConfigurations))
 		d.Set("snapshot_window", rgp.SnapshotWindow)
 		d.Set("snapshot_retention_limit", rgp.SnapshotRetentionLimit)
 
@@ -743,6 +783,31 @@ func resourceReplicationGroupUpdate(d *schema.ResourceData, meta interface{}) er
 			params.CacheSecurityGroupNames = flex.ExpandStringSet(attr)
 			requestUpdate = true
 		}
+	}
+
+	if d.HasChange("log_delivery_configuration") {
+
+		oldLogDeliveryConfig, newLogDeliveryConfig := d.GetChange("log_delivery_configuration")
+
+		params.LogDeliveryConfigurations = []*elasticache.LogDeliveryConfigurationRequest{}
+		logTypesToSubmit := make(map[string]bool)
+
+		currentLogDeliveryConfig := newLogDeliveryConfig.(*schema.Set).List()
+		for _, current := range currentLogDeliveryConfig {
+			logDeliveryConfigurationRequest := expandLogDeliveryConfigurations(current.(map[string]interface{}))
+			logTypesToSubmit[*logDeliveryConfigurationRequest.LogType] = true
+			params.LogDeliveryConfigurations = append(params.LogDeliveryConfigurations, &logDeliveryConfigurationRequest)
+		}
+
+		previousLogDeliveryConfig := oldLogDeliveryConfig.(*schema.Set).List()
+		for _, previous := range previousLogDeliveryConfig {
+			logDeliveryConfigurationRequest := expandEmptyLogDeliveryConfigurations(previous.(map[string]interface{}))
+			//if something was removed, send an empty request
+			if !logTypesToSubmit[*logDeliveryConfigurationRequest.LogType] {
+				params.LogDeliveryConfigurations = append(params.LogDeliveryConfigurations, &logDeliveryConfigurationRequest)
+			}
+		}
+		requestUpdate = true
 	}
 
 	if d.HasChange("maintenance_window") {
@@ -919,12 +984,12 @@ func deleteElasticacheReplicationGroup(replicationGroupID string, conn *elastica
 	// 10 minutes should give any creating/deleting cache clusters or snapshots time to complete
 	err := resource.Retry(10*time.Minute, func() *resource.RetryError {
 		_, err := conn.DeleteReplicationGroup(input)
-		if tfawserr.ErrMessageContains(err, elasticache.ErrCodeReplicationGroupNotFoundFault, "") {
+		if tfawserr.ErrCodeEquals(err, elasticache.ErrCodeReplicationGroupNotFoundFault) {
 			return nil
 		}
 		// Cache Cluster is creating/deleting or Replication Group is snapshotting
 		// InvalidReplicationGroupState: Cache cluster tf-acc-test-uqhe-003 is not in a valid state to be deleted
-		if tfawserr.ErrMessageContains(err, elasticache.ErrCodeInvalidReplicationGroupStateFault, "") {
+		if tfawserr.ErrCodeEquals(err, elasticache.ErrCodeInvalidReplicationGroupStateFault) {
 			return resource.RetryableError(err)
 		}
 		if err != nil {
@@ -936,7 +1001,7 @@ func deleteElasticacheReplicationGroup(replicationGroupID string, conn *elastica
 		_, err = conn.DeleteReplicationGroup(input)
 	}
 
-	if tfawserr.ErrMessageContains(err, elasticache.ErrCodeReplicationGroupNotFoundFault, "") {
+	if tfawserr.ErrCodeEquals(err, elasticache.ErrCodeReplicationGroupNotFoundFault) {
 		return nil
 	}
 	if err != nil {
