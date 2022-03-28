@@ -101,7 +101,7 @@ jobs:
             git push
           else
             releaseBranches=(`echo $branch | grep -Eo "release/.*"`)
-            if [[ ${#releaseBranchs[@]} -eq 1 ]]; then
+            if [[ ${#releaseBranches[@]} -eq 1 ]]; then
               git push origin HEAD:${releaseBranches[0]}
             else
               echo "Unable to update CHANGELOG.md after ${{ needs.release-notes.outputs.tag }}"
