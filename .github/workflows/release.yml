@@ -71,9 +71,9 @@ jobs:
           branch=$(git branch --contains $commit)
           releaseBranches=(`echo $branch | grep -Eo "release/.*"`)
 
-          echo "Commit: $commit"
-          echo "Branch: $branch"
-          echo "Release Branches: $releaseBranches"
+          echo 'Commit: $commit'
+          echo 'Branch: $branch'
+          echo 'Release Branches: $releaseBranches'
         
           
 #          if [[ ${branch} == *"main"* ]]; then
