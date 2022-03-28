@@ -31,6 +31,7 @@ jobs:
           path: release-notes.txt
           retention-days: 1
   terraform-provider-release:
+    needs: [go-version, release-notes]
     runs-on: macos-latest
     steps:
       - name: Release Notes Download
