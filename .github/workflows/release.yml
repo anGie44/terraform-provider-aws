@@ -47,6 +47,9 @@ jobs:
         with:
           # Allow tag to be fetched when ref is a commit
           fetch-depth: 0
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ needs.go-version.outputs.version }}
       - name: Release Notes Download
         id: release-notes-download
         uses: actions/download-artifact@v2
