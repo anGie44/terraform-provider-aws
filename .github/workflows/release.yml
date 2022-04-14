@@ -68,10 +68,10 @@ jobs:
           LATEST=$(git describe --abbrev=0 --match='v*.*.*' --tags)
           echo ::set-output name=tag::$LATEST
   changelog-newversion:
-    needs: [ terraform-provider-release, latest_tag]
+    needs: [ terraform-provider-release, latest-tag]
     # write new changelog header only if release tag is $LATEST i.e. exists on main
     # and not a backport release branch
-    if: github.ref_name == needs.latest_tag.outputs.tag
+    if: github.ref_name == needs.latest-tag.outputs.tag
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
