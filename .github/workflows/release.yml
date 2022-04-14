@@ -68,7 +68,7 @@ jobs:
           LATEST=$(git describe --abbrev=0 --match='v*.*.*' --tags)
           echo ::set-output name=tag::$LATEST
   changelog-newversion:
-    needs: [ terraform-provider-release,  latest_tag]
+    needs: [ terraform-provider-release, latest_tag]
     # write new changelog header only if release tag is $LATEST i.e. exists on main
     # and not a backport release branch
     if: github.ref_name == needs.latest_tag.outputs.tag
@@ -82,8 +82,7 @@ jobs:
         id: changelog
         run: |
           CHANGELOG_FILE_NAME="CHANGELOG.md"
-          PREVIOUS_RELEASE_TAG=$(git describe --abbrev=0 --match='v*.*.*' --tags)
-          echo ::set-output name=tag::$PREVIOUS_RELEASE_TAG
+          PREVIOUS_RELEASE_TAG=${{ github.ref_name }}
           
           # Add Release Date
           RELEASE_DATE=`date +%B' '%e', '%Y`
@@ -105,5 +104,5 @@ jobs:
           git config --local user.email changelogbot@hashicorp.com
           git config --local user.name changelogbot
           git add CHANGELOG.md
-          git commit -m "Update CHANGELOG.md after ${{ steps.changelog.outputs.tag }}" 
+          git commit -m "Update CHANGELOG.md after ${{ github.ref_name }}" 
           git push
