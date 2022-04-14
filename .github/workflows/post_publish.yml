@@ -10,6 +10,15 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - run: echo 'The triggering workflow succeeded'
+      - uses: actions/download-artifact@v3
+        with:
+          name: release_tag
+          path: release_tag.data
+      - name: Output Release Tag
+        id: release-tag
+        run: |
+          value=`cat release_tag.data`
+          echo "GOT TAG: $value"
   on-failure:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
