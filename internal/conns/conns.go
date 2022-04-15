@@ -52,6 +52,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudsearchdomain"
 	"github.com/aws/aws-sdk-go/service/cloudtrail"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go/service/cloudwatchevidently"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/cloudwatchrum"
 	"github.com/aws/aws-sdk-go/service/codeartifact"
@@ -199,6 +200,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/networkfirewall"
 	"github.com/aws/aws-sdk-go/service/networkmanager"
 	"github.com/aws/aws-sdk-go/service/nimblestudio"
+	"github.com/aws/aws-sdk-go/service/opensearchservice"
 	"github.com/aws/aws-sdk-go/service/opsworks"
 	"github.com/aws/aws-sdk-go/service/opsworkscm"
 	"github.com/aws/aws-sdk-go/service/organizations"
@@ -368,6 +370,7 @@ type AWSClient struct {
 	CloudSearchDomainConn             *cloudsearchdomain.CloudSearchDomain
 	CloudTrailConn                    *cloudtrail.CloudTrail
 	CloudWatchConn                    *cloudwatch.CloudWatch
+	CloudWatchEvidentlyConn           *cloudwatchevidently.CloudWatchEvidently
 	CloudWatchLogsConn                *cloudwatchlogs.CloudWatchLogs
 	CloudWatchRUMConn                 *cloudwatchrum.CloudWatchRUM
 	CodeArtifactConn                  *codeartifact.CodeArtifact
@@ -519,6 +522,7 @@ type AWSClient struct {
 	NetworkFirewallConn               *networkfirewall.NetworkFirewall
 	NetworkManagerConn                *networkmanager.NetworkManager
 	NimbleStudioConn                  *nimblestudio.NimbleStudio
+	OpenSearchConn                    *opensearchservice.OpenSearchService
 	OpsWorksCMConn                    *opsworkscm.OpsWorksCM
 	OpsWorksConn                      *opsworks.OpsWorks
 	OrganizationsConn                 *organizations.Organizations
@@ -769,6 +773,7 @@ func (c *Config) Client(ctx context.Context) (interface{}, diag.Diagnostics) {
 		CloudSearchDomainConn:             cloudsearchdomain.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.CloudSearchDomain])})),
 		CloudTrailConn:                    cloudtrail.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.CloudTrail])})),
 		CloudWatchConn:                    cloudwatch.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.CloudWatch])})),
+		CloudWatchEvidentlyConn:           cloudwatchevidently.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.CloudWatchEvidently])})),
 		CloudWatchLogsConn:                cloudwatchlogs.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.CloudWatchLogs])})),
 		CloudWatchRUMConn:                 cloudwatchrum.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.CloudWatchRUM])})),
 		CodeArtifactConn:                  codeartifact.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.CodeArtifact])})),
@@ -918,6 +923,7 @@ func (c *Config) Client(ctx context.Context) (interface{}, diag.Diagnostics) {
 		NetworkFirewallConn:               networkfirewall.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.NetworkFirewall])})),
 		NetworkManagerConn:                networkmanager.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.NetworkManager])})),
 		NimbleStudioConn:                  nimblestudio.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.NimbleStudio])})),
+		OpenSearchConn:                    opensearchservice.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.OpenSearch])})),
 		OpsWorksCMConn:                    opsworkscm.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.OpsWorksCM])})),
 		OpsWorksConn:                      opsworks.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.OpsWorks])})),
 		OrganizationsConn:                 organizations.New(sess.Copy(&aws.Config{Endpoint: aws.String(c.Endpoints[names.Organizations])})),
@@ -1215,6 +1221,26 @@ func (c *Config) Client(ctx context.Context) (interface{}, diag.Diagnostics) {
 		}
 	})
 
+	client.ECSConn.Handlers.Retry.PushBack(func(r *request.Request) {
+		// By design the "WaitUntilServicesStable" method will poll every 15 seconds until a successful state
+		// has been reached. This will exit with a return code of 255 (ResourceNotReady) after 40 failed checks.
+		// Thus, here we retry the operation a set number of times as
+		// described in https://github.com/hashicorp/terraform-provider-aws/pull/23747.
+		if r.Operation.Name == "WaitUntilServicesStable" {
+			if tfawserr.ErrCodeEquals(r.Error, "ResourceNotReady") {
+				// We only want to retry briefly as the default max retry count would
+				// excessively retry when the error could be legitimate.
+				// We currently depend on the DefaultRetryer exponential backoff here.
+				// ~10 retries gives a fair backoff of a few seconds.
+				if r.RetryCount < 9 {
+					r.Retryable = aws.Bool(true)
+				} else {
+					r.Retryable = aws.Bool(false)
+				}
+			}
+		}
+	})
+
 	client.FMSConn.Handlers.Retry.PushBack(func(r *request.Request) {
 		// Acceptance testing creates and deletes resources in quick succession.
 		// The FMS onboarding process into Organizations is opaque to consumers.
@@ -1227,6 +1253,13 @@ func (c *Config) Client(ctx context.Context) (interface{}, diag.Diagnostics) {
 			}
 		case "DisassociateAdminAccount":
 			if tfawserr.ErrMessageContains(r.Error, fms.ErrCodeInvalidOperationException, "Your AWS Organization is currently onboarding with AWS Firewall Manager and cannot be offboarded.") {
+				r.Retryable = aws.Bool(true)
+			}
+		// System problems can arise during FMS policy updates (maybe also creation),
+		// so we set the following operation as retryable.
+		// Reference: https://github.com/hashicorp/terraform-provider-aws/issues/23946
+		case "PutPolicy":
+			if tfawserr.ErrCodeEquals(r.Error, fms.ErrCodeInternalErrorException) {
 				r.Retryable = aws.Bool(true)
 			}
 		}
